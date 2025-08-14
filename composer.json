@@ -1,0 +1,25 @@
+{
+    "name": "yogi-bear-92/graphql-query-builder",
+    "description": "Simple GraphQL query builder for PHP that uses .gql files to build queries with reusable parts",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "GraphQLQueryBuilder\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "GraphQLQueryBuilder\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
