@@ -49,4 +49,26 @@ $result = $builder->loadFromFile(__DIR__ . '/users.gql')
 
 echo "Example 3 - Reusable fragments:\n";
 echo "Query: " . $result['query'] . "\n";
+echo "Variables: " . json_encode($result['variables']) . "\n\n";
+
+// Example 4: Variable definitions (NEW FEATURE)
+$builder->reset();
+$result = $builder->loadFromString('
+    query {
+      user(id: $userId) {
+        id
+        name
+        posts(limit: $limit) {
+          title
+        }
+      }
+    }
+')
+    ->defineVariable('userId', 'ID!')
+    ->defineVariable('limit', 'Int', 5)
+    ->withVariables(['userId' => '789', 'limit' => 3])
+    ->build();
+
+echo "Example 4 - Variable definitions:\n";
+echo "Query: " . $result['query'] . "\n";
 echo "Variables: " . json_encode($result['variables']) . "\n";
