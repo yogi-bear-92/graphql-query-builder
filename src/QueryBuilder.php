@@ -80,15 +80,33 @@ class QueryBuilder
     }
 
     /**
+     * Load a fragment from a file
+     */
+    public function loadFragmentFromFile(string $name, string $filePath): self
+    {
+        if (!file_exists($filePath)) {
+            throw new \InvalidArgumentException("Fragment file not found: {$filePath}");
+        }
+
+        $content = file_get_contents($filePath);
+        if ($content === false) {
+            throw new \RuntimeException("Failed to read fragment file: {$filePath}");
+        }
+
+        $this->fragments[$name] = trim($content);
+        return $this;
+    }
+
+    /**
      * Build the final query with variables and fragments
      */
     public function build(): array
     {
         $finalQuery = $this->query;
 
-        // Replace fragment placeholders
-        foreach ($this->fragments as $name => $fragment) {
-            $finalQuery = str_replace("...{$name}", $fragment, $finalQuery);
+        // Replace fragment placeholders safely
+        if (!empty($this->fragments)) {
+            $finalQuery = $this->replaceFragmentsSafely($finalQuery);
         }
 
         // Inject variable definitions if any are defined and query doesn't already have them
@@ -180,5 +198,111 @@ class QueryBuilder
         } else {
             return (string) $value;
         }
+    }
+
+    /**
+     * Replace fragments safely, avoiding replacement in comments and string literals
+     */
+    private function replaceFragmentsSafely(string $query): string
+    {
+        $resolvedFragments = [];
+        $maxIterations = 10; // Prevent infinite loops
+        $iteration = 0;
+        
+        do {
+            $replacementsMade = false;
+            $iteration++;
+            
+            if ($iteration > $maxIterations) {
+                throw new \RuntimeException('Circular fragment dependency detected or too many nested fragments');
+            }
+            
+            foreach ($this->fragments as $name => $fragment) {
+                $pattern = '/\.\.\.' . preg_quote($name, '/') . '\b/';
+                $newQuery = $this->replaceFragmentPattern($query, $pattern, $fragment);
+                
+                if ($newQuery !== $query) {
+                    $replacementsMade = true;
+                    $query = $newQuery;
+                }
+            }
+        } while ($replacementsMade);
+        
+        return $query;
+    }
+
+    /**
+     * Replace fragment pattern while avoiding comments and string literals
+     */
+    private function replaceFragmentPattern(string $query, string $pattern, string $replacement): string
+    {
+        $result = '';
+        $inString = false;
+        $inComment = false;
+        $stringChar = null;
+        $i = 0;
+        $length = strlen($query);
+        
+        while ($i < $length) {
+            $char = $query[$i];
+            $nextChar = ($i + 1 < $length) ? $query[$i + 1] : null;
+            
+            // Handle string literals
+            if (!$inComment && ($char === '"' || $char === "'")) {
+                if (!$inString) {
+                    $inString = true;
+                    $stringChar = $char;
+                } elseif ($char === $stringChar && ($i === 0 || $query[$i - 1] !== '\\')) {
+                    $inString = false;
+                    $stringChar = null;
+                }
+                $result .= $char;
+                $i++;
+                continue;
+            }
+            
+            // Handle comments
+            if (!$inString && $char === '#') {
+                $inComment = true;
+                $result .= $char;
+                $i++;
+                continue;
+            }
+            
+            // End of comment at newline
+            if ($inComment && ($char === "\n" || $char === "\r")) {
+                $inComment = false;
+                $result .= $char;
+                $i++;
+                continue;
+            }
+            
+            // If we're in a string or comment, just copy the character
+            if ($inString || $inComment) {
+                $result .= $char;
+                $i++;
+                continue;
+            }
+            
+            // Check for fragment pattern at this position
+            $remainingQuery = substr($query, $i);
+            if (preg_match($pattern, $remainingQuery, $matches, PREG_OFFSET_CAPTURE)) {
+                $matchStart = $matches[0][1];
+                $matchLength = strlen($matches[0][0]);
+                
+                if ($matchStart === 0) {
+                    // Found a match at the current position
+                    $result .= $replacement;
+                    $i += $matchLength;
+                    continue;
+                }
+            }
+            
+            // No match, copy the character
+            $result .= $char;
+            $i++;
+        }
+        
+        return $result;
     }
 }

@@ -177,4 +177,99 @@ class QueryBuilderTest extends TestCase
         // Should not contain variable definitions after reset
         $this->assertStringNotContainsString('$id: ID!', $result['query']);
     }
+
+    public function testFragmentNotReplacedInComments(): void
+    {
+        $result = $this->builder
+            ->loadFromString('
+                query {
+                    # This comment mentions ...UserFragment but should not be replaced
+                    user {
+                        ...UserFragment
+                    }
+                }
+            ')
+            ->addFragment('UserFragment', 'id name')
+            ->build();
+        
+        // Fragment should be replaced in the actual query
+        $this->assertStringContainsString('id name', $result['query']);
+        // But NOT in the comment
+        $this->assertStringNotContainsString('# This comment mentions id name', $result['query']);
+        $this->assertStringContainsString('# This comment mentions ...UserFragment', $result['query']);
+    }
+
+    public function testFragmentNotReplacedInStringLiterals(): void
+    {
+        $result = $this->builder
+            ->loadFromString('
+                query {
+                    user(description: "This mentions ...UserFragment in a string") {
+                        ...UserFragment
+                    }
+                }
+            ')
+            ->addFragment('UserFragment', 'id name')
+            ->build();
+        
+        // Fragment should be replaced in the actual query
+        $this->assertStringContainsString('id name', $result['query']);
+        // But NOT in the string literal
+        $this->assertStringNotContainsString('"This mentions id name in a string"', $result['query']);
+        $this->assertStringContainsString('"This mentions ...UserFragment in a string"', $result['query']);
+    }
+
+    public function testNestedFragments(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { ...UserFragment } }')
+            ->addFragment('UserFragment', 'id name ...ProfileFragment')
+            ->addFragment('ProfileFragment', 'avatar bio')
+            ->build();
+        
+        // Both fragments should be resolved
+        $this->assertStringContainsString('id name', $result['query']);
+        $this->assertStringContainsString('avatar bio', $result['query']);
+        // No fragment placeholders should remain
+        $this->assertStringNotContainsString('...UserFragment', $result['query']);
+        $this->assertStringNotContainsString('...ProfileFragment', $result['query']);
+    }
+
+    public function testLoadFragmentFromFile(): void
+    {
+        // Create a temporary fragment file
+        $fragPath = '/tmp/test_fragment.gql';
+        file_put_contents($fragPath, 'id name email created_at');
+        
+        $result = $this->builder
+            ->loadFromString('query { user { ...TestFragment } }')
+            ->loadFragmentFromFile('TestFragment', $fragPath)
+            ->build();
+        
+        $this->assertStringContainsString('id name email created_at', $result['query']);
+        $this->assertStringNotContainsString('...TestFragment', $result['query']);
+        
+        // Clean up
+        unlink($fragPath);
+    }
+
+    public function testLoadFragmentFromFileNotFound(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Fragment file not found');
+        
+        $this->builder->loadFragmentFromFile('TestFragment', '/nonexistent/path.gql');
+    }
+
+    public function testCircularFragmentDependency(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Circular fragment dependency detected');
+        
+        $this->builder
+            ->loadFromString('query { user { ...FragmentA } }')
+            ->addFragment('FragmentA', 'id ...FragmentB')
+            ->addFragment('FragmentB', 'name ...FragmentA')
+            ->build();
+    }
 }
