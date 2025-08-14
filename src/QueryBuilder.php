@@ -14,6 +14,10 @@ class QueryBuilder
     private array $variableDefinitions = [];
     private array $aliases = [];
     private array $directives = [];
+    
+    // Fluent API properties
+    private ?array $fluentOperation = null; // Stores the operation being built
+    private array $selectionStack = []; // Stack for nested selections
 
     /**
      * Load GraphQL query from a .gql file
@@ -143,11 +147,123 @@ class QueryBuilder
     }
 
     /**
+     * Start building a query operation using fluent API
+     * 
+     * @param string|null $operationName Optional operation name
+     * @return self Returns this instance for method chaining
+     */
+    public function query(?string $operationName = null): self
+    {
+        $this->initFluentOperation('query', $operationName);
+        return $this;
+    }
+
+    /**
+     * Start building a mutation operation using fluent API
+     * 
+     * @param string|null $operationName Optional operation name
+     * @return self Returns this instance for method chaining
+     */
+    public function mutation(?string $operationName = null): self
+    {
+        $this->initFluentOperation('mutation', $operationName);
+        return $this;
+    }
+
+    /**
+     * Start building a subscription operation using fluent API
+     * 
+     * @param string|null $operationName Optional operation name
+     * @return self Returns this instance for method chaining
+     */
+    public function subscription(?string $operationName = null): self
+    {
+        $this->initFluentOperation('subscription', $operationName);
+        return $this;
+    }
+
+    /**
+     * Add a field to the current selection set
+     * 
+     * @param string $name Field name
+     * @param array $arguments Optional field arguments
+     * @param string|null $alias Optional field alias
+     * @return self Returns this instance for method chaining
+     */
+    public function field(string $name, array $arguments = [], ?string $alias = null): self
+    {
+        $this->ensureFluentOperation();
+        
+        $field = [
+            'type' => 'field',
+            'name' => $name,
+            'arguments' => $arguments,
+            'alias' => $alias
+        ];
+        
+        $this->addToCurrentSelection($field);
+        return $this;
+    }
+
+    /**
+     * Start a nested object selection
+     * 
+     * @param string $name Object field name
+     * @param array $arguments Optional field arguments
+     * @param string|null $alias Optional field alias
+     * @return self Returns this instance for method chaining
+     */
+    public function object(string $name, array $arguments = [], ?string $alias = null): self
+    {
+        $this->ensureFluentOperation();
+        
+        $object = [
+            'type' => 'object',
+            'name' => $name,
+            'arguments' => $arguments,
+            'alias' => $alias,
+            'selections' => []
+        ];
+        
+        // Add the object to the current selection
+        if (empty($this->selectionStack)) {
+            throw new \LogicException('No selection context available');
+        }
+        
+        $currentSelection = &$this->selectionStack[count($this->selectionStack) - 1];
+        $currentSelection[] = &$object;
+        
+        // Push the object's selections onto the stack so new fields go into it
+        $this->selectionStack[] = &$object['selections'];
+        return $this;
+    }
+
+    /**
+     * End the current nested selection and go back to parent level
+     * 
+     * @return self Returns this instance for method chaining
+     */
+    public function end(): self
+    {
+        if (count($this->selectionStack) <= 1) {
+            throw new \LogicException('Cannot call end() - no nested selection to close');
+        }
+        
+        array_pop($this->selectionStack);
+        return $this;
+    }
+
+    /**
      * Build the final query with variables and fragments
      */
     public function build(): array
     {
         $finalQuery = $this->query;
+        
+        // If we have a fluent operation, build the query from it
+        if ($this->fluentOperation !== null) {
+            $finalQuery = $this->buildFluentQuery();
+        }
 
         // Replace fragment placeholders safely
         if (!empty($this->fragments)) {
@@ -197,7 +313,122 @@ class QueryBuilder
         $this->variableDefinitions = [];
         $this->aliases = [];
         $this->directives = [];
+        $this->fluentOperation = null;
+        $this->selectionStack = [];
         return $this;
+    }
+
+    /**
+     * Initialize a fluent operation
+     */
+    private function initFluentOperation(string $type, ?string $name): void
+    {
+        $this->fluentOperation = [
+            'type' => $type,
+            'name' => $name,
+            'selections' => []
+        ];
+        $this->selectionStack = [&$this->fluentOperation['selections']];
+    }
+
+    /**
+     * Ensure a fluent operation is initialized
+     */
+    private function ensureFluentOperation(): void
+    {
+        if ($this->fluentOperation === null) {
+            $this->initFluentOperation('query', null);
+        }
+    }
+
+    /**
+     * Add a selection to the current selection set
+     */
+    private function addToCurrentSelection(array $selection): void
+    {
+        if (empty($this->selectionStack)) {
+            throw new \LogicException('No selection context available');
+        }
+        
+        $currentSelection = &$this->selectionStack[count($this->selectionStack) - 1];
+        $currentSelection[] = $selection;
+    }
+
+    /**
+     * Build GraphQL query string from fluent operation
+     */
+    private function buildFluentQuery(): string
+    {
+        if ($this->fluentOperation === null || empty($this->fluentOperation['selections'])) {
+            throw new \LogicException('No fluent operation or selections defined');
+        }
+        
+        $operation = $this->fluentOperation;
+        $query = $operation['type'];
+        
+        if ($operation['name']) {
+            $query .= ' ' . $operation['name'];
+        }
+        
+        // Add variable definitions if any are defined
+        if (!empty($this->variableDefinitions)) {
+            $definitions = [];
+            foreach ($this->variableDefinitions as $name => $definition) {
+                $varDef = '$' . $name . ': ' . $definition['type'];
+                if ($definition['hasDefaultValue']) {
+                    $varDef .= ' = ' . $this->formatDefaultValue($definition['defaultValue']);
+                }
+                $definitions[] = $varDef;
+            }
+            $query .= '(' . implode(', ', $definitions) . ')';
+        }
+        
+        $query .= ' {' . "\n";
+        $query .= $this->buildSelections($operation['selections'], 1);
+        $query .= '}';
+        
+        return $query;
+    }
+
+    /**
+     * Build selection set from fluent selections
+     */
+    private function buildSelections(array $selections, int $indent = 0): string
+    {
+        $indentStr = str_repeat('  ', $indent);
+        $result = '';
+        
+        foreach ($selections as $selection) {
+            $result .= $indentStr;
+            
+            // Add alias if present
+            if (!empty($selection['alias'])) {
+                $result .= $selection['alias'] . ': ';
+            }
+            
+            // Add field name
+            $result .= $selection['name'];
+            
+            // Add arguments if present
+            if (!empty($selection['arguments'])) {
+                $argPairs = [];
+                foreach ($selection['arguments'] as $name => $value) {
+                    $argPairs[] = $name . ': ' . $this->formatArgumentValue($value);
+                }
+                $result .= '(' . implode(', ', $argPairs) . ')';
+            }
+            
+            // Add nested selections for objects
+            if ($selection['type'] === 'object' && !empty($selection['selections'])) {
+                $result .= ' {' . "\n";
+                $result .= $this->buildSelections($selection['selections'], $indent + 1);
+                $result .= $indentStr . '}';
+            }
+            
+            $result .= "\n";
+        }
+        
+        return $result;
     }
 
     /**

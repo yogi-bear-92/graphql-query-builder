@@ -401,4 +401,212 @@ class QueryBuilderTest extends TestCase
         $this->assertStringContainsString('nullArg: null', $query);
         $this->assertStringContainsString('varArg: $variable', $query);
     }
+
+    // Fluent API Tests
+
+    public function testFluentQueryBasic(): void
+    {
+        $result = $this->builder
+            ->query('GetUser')
+            ->field('id')
+            ->field('name')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query GetUser {', $query);
+        $this->assertStringContainsString('id', $query);
+        $this->assertStringContainsString('name', $query);
+    }
+
+    public function testFluentQueryWithoutName(): void
+    {
+        $result = $this->builder
+            ->query()
+            ->field('user')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query {', $query);
+        $this->assertStringContainsString('user', $query);
+    }
+
+    public function testFluentMutation(): void
+    {
+        $result = $this->builder
+            ->mutation('CreateUser')
+            ->field('createUser', ['input' => '$input'])
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('mutation CreateUser {', $query);
+        $this->assertStringContainsString('createUser(input: $input)', $query);
+    }
+
+    public function testFluentSubscription(): void
+    {
+        $result = $this->builder
+            ->subscription('UserUpdates')
+            ->field('userUpdated')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('subscription UserUpdates {', $query);
+        $this->assertStringContainsString('userUpdated', $query);
+    }
+
+    public function testFluentFieldWithArguments(): void
+    {
+        $result = $this->builder
+            ->query()
+            ->field('user', ['id' => '$userId', 'active' => true])
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('user(id: $userId, active: true)', $query);
+    }
+
+    public function testFluentFieldWithAlias(): void
+    {
+        $result = $this->builder
+            ->query()
+            ->field('user', ['role' => 'ADMIN'], 'adminUser')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('adminUser: user(role: "ADMIN")', $query);
+    }
+
+    public function testFluentNestedObjects(): void
+    {
+        $result = $this->builder
+            ->query('GetUser')
+            ->object('user', ['id' => '$userId'])
+                ->field('id')
+                ->field('name')
+                ->object('profile')
+                    ->field('avatar')
+                    ->field('bio')
+                ->end()
+            ->end()
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query GetUser {', $query);
+        $this->assertStringContainsString('user(id: $userId) {', $query);
+        $this->assertStringContainsString('profile {', $query);
+        $this->assertStringContainsString('avatar', $query);
+        $this->assertStringContainsString('bio', $query);
+    }
+
+    public function testFluentObjectWithAlias(): void
+    {
+        $result = $this->builder
+            ->query()
+            ->object('user', ['role' => 'ADMIN'], 'adminUser')
+                ->field('id')
+                ->field('name')
+            ->end()
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('adminUser: user(role: "ADMIN") {', $query);
+        $this->assertStringContainsString('id', $query);
+        $this->assertStringContainsString('name', $query);
+    }
+
+    public function testFluentMixWithVariableDefinitions(): void
+    {
+        $result = $this->builder
+            ->query('GetUser')
+            ->defineVariable('userId', 'ID!')
+            ->defineVariable('includeProfile', 'Boolean', false)
+            ->object('user', ['id' => '$userId'])
+                ->field('id')
+                ->field('name')
+            ->end()
+            ->withVariables(['userId' => '123', 'includeProfile' => true])
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query GetUser($userId: ID!, $includeProfile: Boolean = false) {', $query);
+        $this->assertStringContainsString('user(id: $userId)', $query);
+        $this->assertEquals(['userId' => '123', 'includeProfile' => true], $result['variables']);
+    }
+
+    public function testFluentMixWithExistingQuery(): void
+    {
+        // First set up with string query
+        $this->builder->loadFromString('query { existing { field } }');
+        
+        // Then use fluent API - should override
+        $result = $this->builder
+            ->query('NewQuery')
+            ->field('newField')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query NewQuery {', $query);
+        $this->assertStringContainsString('newField', $query);
+        $this->assertStringNotContainsString('existing', $query);
+    }
+
+    public function testFluentEndWithoutNestedSelection(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Cannot call end() - no nested selection to close');
+        
+        $this->builder
+            ->query()
+            ->field('test')
+            ->end(); // Should throw exception
+    }
+
+    public function testFluentBuildWithoutOperation(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('No fluent operation or selections defined');
+        
+        $this->builder
+            ->query()
+            // No fields added
+            ->build();
+    }
+
+    public function testFluentArgumentFormatting(): void
+    {
+        $result = $this->builder
+            ->query()
+            ->field('test', [
+                'stringArg' => 'hello',
+                'intArg' => 42,
+                'boolArg' => true,
+                'nullArg' => null,
+                'varArg' => '$variable'
+            ])
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('stringArg: "hello"', $query);
+        $this->assertStringContainsString('intArg: 42', $query);
+        $this->assertStringContainsString('boolArg: true', $query);
+        $this->assertStringContainsString('nullArg: null', $query);
+        $this->assertStringContainsString('varArg: $variable', $query);
+    }
+
+    public function testFluentResetClearsFluentState(): void
+    {
+        $this->builder
+            ->query('Test')
+            ->field('testField')
+            ->reset();
+        
+        // After reset, should be able to use regular string loading
+        $result = $this->builder
+            ->loadFromString('query { differentField }')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('differentField', $query);
+        $this->assertStringNotContainsString('testField', $query);
+    }
 }
