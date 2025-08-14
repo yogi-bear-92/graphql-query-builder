@@ -12,6 +12,8 @@ class QueryBuilder
     private array $variables = [];
     private array $fragments = [];
     private array $variableDefinitions = [];
+    private array $aliases = [];
+    private array $directives = [];
 
     /**
      * Load GraphQL query from a .gql file
@@ -71,6 +73,49 @@ class QueryBuilder
     }
 
     /**
+     * Add an alias for a field in the query
+     * 
+     * This method enables field aliasing in GraphQL queries.
+     * For example: admin: user(role: ADMIN) { name }
+     * 
+     * @param string $alias The alias name to use
+     * @param string $field The actual field name
+     * @param array $arguments Optional field arguments
+     * @return self Returns this instance for method chaining
+     */
+    public function addAlias(string $alias, string $field, array $arguments = []): self
+    {
+        $this->aliases[$alias] = [
+            'field' => $field,
+            'arguments' => $arguments
+        ];
+        return $this;
+    }
+
+    /**
+     * Add a directive to a field in the query
+     * 
+     * This method enables adding GraphQL directives like @include, @skip, etc.
+     * For example: user @include(if: $showUser) { name }
+     * 
+     * @param string $field The field name to apply the directive to
+     * @param string $directive The directive name (without @)
+     * @param array $arguments Optional directive arguments
+     * @return self Returns this instance for method chaining
+     */
+    public function addDirective(string $field, string $directive, array $arguments = []): self
+    {
+        if (!isset($this->directives[$field])) {
+            $this->directives[$field] = [];
+        }
+        $this->directives[$field][] = [
+            'name' => $directive,
+            'arguments' => $arguments
+        ];
+        return $this;
+    }
+
+    /**
      * Add a reusable fragment
      */
     public function addFragment(string $name, string $fragment): self
@@ -109,6 +154,11 @@ class QueryBuilder
             $finalQuery = $this->replaceFragmentsSafely($finalQuery);
         }
 
+        // Apply aliases and directives
+        if (!empty($this->aliases) || !empty($this->directives)) {
+            $finalQuery = $this->applyAliasesAndDirectives($finalQuery);
+        }
+
         // Inject variable definitions if any are defined and query doesn't already have them
         if (!empty($this->variableDefinitions)) {
             $finalQuery = $this->injectVariableDefinitions($finalQuery);
@@ -145,6 +195,8 @@ class QueryBuilder
         $this->variables = [];
         $this->fragments = [];
         $this->variableDefinitions = [];
+        $this->aliases = [];
+        $this->directives = [];
         return $this;
     }
 
@@ -304,5 +356,115 @@ class QueryBuilder
         }
         
         return $result;
+    }
+
+    /**
+     * Apply aliases and directives to the query
+     */
+    private function applyAliasesAndDirectives(string $query): string
+    {
+        // For simplicity, this is a basic implementation
+        // In a production system, you'd want a proper GraphQL parser
+        
+        // First, collect all transformations we need to make
+        $transformations = [];
+        
+        // Collect alias transformations
+        foreach ($this->aliases as $alias => $config) {
+            $field = $config['field'];
+            $arguments = $config['arguments'];
+            
+            // Build arguments string
+            $argsString = '';
+            if (!empty($arguments)) {
+                $argPairs = [];
+                foreach ($arguments as $name => $value) {
+                    $argPairs[] = $name . ': ' . $this->formatArgumentValue($value);
+                }
+                $argsString = '(' . implode(', ', $argPairs) . ')';
+            }
+            
+            $transformations[$field] = [
+                'alias' => $alias,
+                'arguments' => $argsString,
+                'directives' => []
+            ];
+        }
+        
+        // Collect directive transformations
+        foreach ($this->directives as $field => $directiveList) {
+            if (!isset($transformations[$field])) {
+                $transformations[$field] = [
+                    'alias' => null,
+                    'arguments' => '',
+                    'directives' => []
+                ];
+            }
+            
+            foreach ($directiveList as $directiveConfig) {
+                $directiveName = $directiveConfig['name'];
+                $arguments = $directiveConfig['arguments'];
+                
+                // Build directive arguments string
+                $argsString = '';
+                if (!empty($arguments)) {
+                    $argPairs = [];
+                    foreach ($arguments as $name => $value) {
+                        $argPairs[] = $name . ': ' . $this->formatArgumentValue($value);
+                    }
+                    $argsString = '(' . implode(', ', $argPairs) . ')';
+                }
+                
+                $transformations[$field]['directives'][] = '@' . $directiveName . $argsString;
+            }
+        }
+        
+        // Apply all transformations
+        foreach ($transformations as $field => $transform) {
+            $newField = '';
+            
+            // Add alias if present
+            if ($transform['alias']) {
+                $newField .= $transform['alias'] . ': ';
+            }
+            
+            // Add field name
+            $newField .= $field;
+            
+            // Add arguments if present
+            $newField .= $transform['arguments'];
+            
+            // Add directives if present
+            if (!empty($transform['directives'])) {
+                $newField .= ' ' . implode(' ', $transform['directives']);
+            }
+            
+            // Replace in query - need to be more precise about the replacement
+            // Look for the field with potential existing arguments
+            $pattern = '/\b' . preg_quote($field, '/') . '(\s*\([^)]*\))?\b/';
+            $query = preg_replace($pattern, $newField, $query, 1);
+        }
+        
+        return $query;
+    }
+
+    /**
+     * Format argument value for GraphQL
+     */
+    private function formatArgumentValue($value): string
+    {
+        if (is_string($value)) {
+            // Check if it's a variable reference
+            if (strpos($value, '$') === 0) {
+                return $value; // Variable reference, don't quote
+            }
+            return '"' . addslashes($value) . '"';
+        } elseif (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        } elseif (is_null($value)) {
+            return 'null';
+        } else {
+            return (string) $value;
+        }
     }
 }

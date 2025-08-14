@@ -272,4 +272,133 @@ class QueryBuilderTest extends TestCase
             ->addFragment('FragmentB', 'name ...FragmentA')
             ->build();
     }
+
+    public function testAddAlias(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addAlias('admin', 'user', ['role' => 'ADMIN'])
+            ->build();
+        
+        $this->assertStringContainsString('admin: user(role: "ADMIN")', $result['query']);
+        $this->assertStringNotContainsString('user {', $result['query']);
+    }
+
+    public function testAddAliasWithoutArguments(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addAlias('currentUser', 'user')
+            ->build();
+        
+        $this->assertStringContainsString('currentUser: user', $result['query']);
+    }
+
+    public function testAddDirective(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addDirective('user', 'include', ['if' => '$showUser'])
+            ->build();
+        
+        $this->assertStringContainsString('user @include(if: $showUser)', $result['query']);
+    }
+
+    public function testAddDirectiveWithoutArguments(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addDirective('user', 'deprecated')
+            ->build();
+        
+        $this->assertStringContainsString('user @deprecated', $result['query']);
+    }
+
+    public function testMultipleDirectivesOnSameField(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addDirective('user', 'include', ['if' => '$showUser'])
+            ->addDirective('user', 'deprecated')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('user @include(if: $showUser) @deprecated', $query);
+    }
+
+    public function testCombinedAliasAndDirective(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addAlias('admin', 'user', ['role' => 'ADMIN'])
+            ->addDirective('user', 'include', ['if' => '$showAdmin'])
+            ->build();
+        
+        $this->assertStringContainsString('admin: user(role: "ADMIN") @include(if: $showAdmin)', $result['query']);
+    }
+
+    public function testDirectiveWithVariableDefinitions(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addDirective('user', 'include', ['if' => '$showUser'])
+            ->defineVariable('showUser', 'Boolean', true)
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('query($showUser: Boolean = true)', $query);
+        $this->assertStringContainsString('user @include(if: $showUser)', $query);
+    }
+
+    public function testAliasWithMutation(): void
+    {
+        $result = $this->builder
+            ->loadFromString('mutation { createUser { id } }')
+            ->addAlias('newUser', 'createUser', ['input' => '$userInput'])
+            ->defineVariable('userInput', 'CreateUserInput!')
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('mutation($userInput: CreateUserInput!)', $query);
+        $this->assertStringContainsString('newUser: createUser(input: $userInput)', $query);
+    }
+
+    public function testResetClearsAliasesAndDirectives(): void
+    {
+        $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addAlias('admin', 'user')
+            ->addDirective('user', 'include', ['if' => '$show']);
+        
+        $this->builder->reset();
+        
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->build();
+        
+        // Should not contain aliases or directives after reset
+        $this->assertStringNotContainsString('admin:', $result['query']);
+        $this->assertStringNotContainsString('@include', $result['query']);
+    }
+
+    public function testDirectiveArgumentTypes(): void
+    {
+        $result = $this->builder
+            ->loadFromString('query { user { name } }')
+            ->addDirective('user', 'testDirective', [
+                'stringArg' => 'hello',
+                'intArg' => 42,
+                'boolArg' => true,
+                'nullArg' => null,
+                'varArg' => '$variable'
+            ])
+            ->build();
+        
+        $query = $result['query'];
+        $this->assertStringContainsString('stringArg: "hello"', $query);
+        $this->assertStringContainsString('intArg: 42', $query);
+        $this->assertStringContainsString('boolArg: true', $query);
+        $this->assertStringContainsString('nullArg: null', $query);
+        $this->assertStringContainsString('varArg: $variable', $query);
+    }
 }

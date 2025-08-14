@@ -122,4 +122,47 @@ $result = $builder->loadFromString('
 
 echo "Example 6 - Nested fragments:\n";
 echo "Query: " . $result['query'] . "\n";
+echo "Variables: " . json_encode($result['variables']) . "\n\n";
+
+// Example 7: Basic Aliases
+$builder->reset();
+$result = $builder->loadFromString('
+    query GetUsers {
+        user {
+            id
+            name
+            email
+        }
+    }
+')
+    ->addAlias('admin', 'user', ['role' => 'ADMIN'])
+    ->build();
+
+echo "Example 7 - Basic Aliases:\n";
+echo "Query: " . $result['query'] . "\n";
+echo "Variables: " . json_encode($result['variables']) . "\n\n";
+
+// Example 8: Basic Directives
+$builder->reset();
+$result = $builder->loadFromString('
+    query GetUser {
+        user {
+            id
+            name
+            email
+        }
+    }
+')
+    ->addDirective('user', 'include', ['if' => '$showUser'])
+    ->addDirective('name', 'skip', ['if' => '$hideName'])
+    ->defineVariable('showUser', 'Boolean', true)
+    ->defineVariable('hideName', 'Boolean', false)
+    ->withVariables([
+        'showUser' => true,
+        'hideName' => false
+    ])
+    ->build();
+
+echo "Example 8 - Basic Directives:\n";
+echo "Query: " . $result['query'] . "\n";
 echo "Variables: " . json_encode($result['variables']) . "\n";
