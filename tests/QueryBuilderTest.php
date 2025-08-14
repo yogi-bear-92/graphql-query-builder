@@ -41,8 +41,8 @@ class QueryBuilderTest extends TestCase
             ->addFragment('UserFragment', 'id name email')
             ->build();
         
-        $this->assertStringContains('id name email', $result['query']);
-        $this->assertStringNotContains('...UserFragment', $result['query']);
+        $this->assertStringContainsString('id name email', $result['query']);
+        $this->assertStringNotContainsString('...UserFragment', $result['query']);
     }
 
     public function testMultipleFragments(): void
@@ -53,8 +53,8 @@ class QueryBuilderTest extends TestCase
             ->addFragment('ProfileFragment', 'avatar bio')
             ->build();
         
-        $this->assertStringContains('id name', $result['query']);
-        $this->assertStringContains('avatar bio', $result['query']);
+        $this->assertStringContainsString('id name', $result['query']);
+        $this->assertStringContainsString('avatar bio', $result['query']);
     }
 
     public function testReset(): void
