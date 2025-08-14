@@ -1,0 +1,13 @@
+query GetUsers($first: Int, $after: String) {
+  users(first: $first, after: $after) {
+    edges {
+      node {
+        ...UserFragment
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
