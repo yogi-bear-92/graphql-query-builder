@@ -1,242 +1,344 @@
 # GitHub Issues Template Reference
 
-This document provides ready-to-use templates for creating the 13 specific issues outlined in the PROJECT_PLAN.md.
+This document provides ready-to-use templates for creating the 8 specific issues outlined in the updated PROJECT_PLAN.md.
 
-## Milestone 1 - Core Enhancements
+**Important**: Most core features from the original plan are already implemented. These templates focus on the remaining work for code quality, documentation, and release preparation.
 
-### Issue #1: Add Variable Definition Support
+## ✅ Already Implemented (No Issues Needed)
+- Variable definition support with `defineVariable()`
+- Nested fragments and safe replacement  
+- Fragment file imports with `loadFragmentFromFile()`
+- Mutation and alias handling with fluent API
+- Comprehensive fluent query builder methods
+- Multiple operation support (query, mutation, subscription)
+- Directive support (@include, @skip)
+- Comprehensive test coverage (44 tests passing)
 
-**Title**: [Core] Add Variable Definition Support
+## 🔄 Remaining Work (Issues to Create)
 
-**Labels**: enhancement, core, milestone-1
+## Milestone 1 - Code Quality and Standards
+
+### Issue #1: Introduce PSR-12 Coding Standards
+
+**Title**: [Quality] Introduce PSR-12 Coding Standards
+
+**Labels**: enhancement, quality, milestone-1
 
 **Body**:
 ```markdown
 ## Problem Description
-Currently, variables are only returned separately in the build() result array, not injected into the query string itself. This means the generated queries are incomplete and require manual variable definition.
+Currently there is no automated code style checking, which can lead to inconsistent code formatting and style across the project.
 
 ## Proposed Solution
-Enhance the builder to accept GraphQL variable definitions (types and default values) and inject them into the query's operation definition.
+Add PHP CodeSniffer or PHP CS Fixer to enforce PSR-12 coding standards automatically.
 
 ## Acceptance Criteria
-- [ ] Add `defineVariable($name, $type, $defaultValue = null)` method
-- [ ] Inject variable definitions into query string: `query($id: ID!) { ... }`
-- [ ] Support multiple variable definitions
-- [ ] Maintain backward compatibility with current variable handling
-- [ ] Support both nullable and non-nullable types
+- [ ] Add coding standard tool to composer.json dev dependencies
+- [ ] Configure PSR-12 ruleset
+- [ ] Fix any existing style violations in current code
+- [ ] Add composer scripts: `composer check-style` and `composer fix-style`
+- [ ] Update CONTRIBUTING.md with style guidelines
 
 ## Implementation Notes
-- Parse existing query to identify operation type (query/mutation)
-- Inject variable definitions after operation name but before selection set
-- Handle cases where query already has variable definitions
+- Choose between `squizlabs/php_codesniffer` or `friendsofphp/php-cs-fixer`
+- Configure to check `src/` and `tests/` directories
+- Add phpcs.xml or .php-cs-fixer.php configuration file
 
 ## Testing Requirements
-- [ ] Unit tests for defineVariable method
-- [ ] Test variable injection into various query types
-- [ ] Test backward compatibility with existing withVariables usage
-- [ ] Test edge cases (empty variables, duplicate names)
+- [ ] Verify all existing code passes style checks
+- [ ] Document style check process in README
+- [ ] Ensure CI will run style checks (when implemented)
 
 ## Documentation Updates
-- [ ] PHPDoc comments for new methods
-- [ ] README examples showing variable definition usage
-- [ ] Update examples/example.php with variable definitions
+- [ ] Add style checking instructions to README
+- [ ] Update development workflow documentation
 ```
 
 ---
 
-### Issue #2: Support Nested Fragments and Imports
+### Issue #2: Add Static Analysis Tools
 
-**Title**: [Core] Support Nested Fragments and Imports  
+**Title**: [Quality] Add Static Analysis Tools  
 
-**Labels**: enhancement, core, milestone-1
+**Labels**: enhancement, quality, milestone-1
 
 **Body**:
 ```markdown
 ## Problem Description
-Current fragment replacement uses simple string replacement (`str_replace`) which can cause issues with fragments in comments, string literals, or nested fragment scenarios.
+No static analysis is performed on the codebase, which could miss type-related errors and potential bugs before runtime.
 
 ## Proposed Solution
-Replace simple string replacement with proper GraphQL parsing for safe fragment handling and support for nested fragments.
+Integrate PHPStan or Psalm for static analysis to catch type errors and potential issues early.
 
 ## Acceptance Criteria
-- [ ] Parse GraphQL to identify fragment placeholders safely
-- [ ] Support fragments that contain other fragment references
-- [ ] Add `loadFragmentFromFile($name, $filePath)` method
-- [ ] Avoid accidental replacement in comments or string literals
-- [ ] Support fragment imports from external files
+- [ ] Add PHPStan to dev dependencies
+- [ ] Configure appropriate analysis level (start with level 6+)
+- [ ] Fix any detected issues in current codebase
+- [ ] Add composer script: `composer analyse`
+- [ ] Configure phpstan.neon with project-specific rules
 
 ## Implementation Notes
-- Consider using `webonyx/graphql-php` for parsing
-- Implement recursive fragment resolution
-- Handle circular fragment dependencies gracefully
+- Start with reasonable analysis level, can be increased over time
+- Focus on type coverage and potential null pointer issues
+- Consider adding psalm as alternative/additional tool
 
 ## Testing Requirements
-- [ ] Test nested fragment scenarios
-- [ ] Test fragments in comments (should not be replaced)
-- [ ] Test fragment imports from files
-- [ ] Test circular dependency detection
+- [ ] All current code passes static analysis
+- [ ] Document analysis process for contributors
+- [ ] Add baseline file if needed for gradual adoption
 
 ## Documentation Updates
-- [ ] Examples showing nested fragment usage
-- [ ] Documentation for fragment import methods
-- [ ] Best practices for fragment organization
+- [ ] Add static analysis instructions to development docs
+- [ ] Document how to handle analysis issues
 ```
 
 ---
 
-### Issue #3: Implement Mutation and Alias Handling
+## Milestone 2 - Enhanced Documentation
 
-**Title**: [Core] Implement Mutation and Alias Handling
+### Issue #3: Expand README with Complete API Documentation
 
-**Labels**: enhancement, core, milestone-1
+**Title**: [Documentation] Expand README with Complete API Documentation
+
+**Labels**: documentation, milestone-2
 
 **Body**:
 ```markdown
 ## Problem Description
-Library currently only supports query operations. No support for mutations, field aliases, or directives.
+Current README only covers basic usage and doesn't document all the implemented features like variable definitions, fragments, aliases, directives, and fluent API.
 
 ## Proposed Solution
-Extend the API to build mutations and support aliasing fields and basic directives.
+Create comprehensive API documentation with examples covering all features that are currently implemented.
 
 ## Acceptance Criteria
-- [ ] Support building mutations: `mutation { createUser(...) { id } }`
-- [ ] Add alias support: `admin: user(role: ADMIN) { name }`
-- [ ] Support basic directives: `@include(if: $condition)`, `@skip(if: $condition)`
-- [ ] Detect operation type automatically
-- [ ] Add examples demonstrating new features
+- [ ] Document all public methods with usage examples
+- [ ] Add comprehensive installation and quick start guide
+- [ ] Include fluent API examples and patterns
+- [ ] Document variable definitions with type examples
+- [ ] Show fragment usage including file imports and nested fragments
+- [ ] Document aliases and directive usage
+- [ ] Add troubleshooting section with common issues
+- [ ] Add performance considerations and best practices
 
 ## Implementation Notes
-- Extend current query detection to handle mutations
-- Add methods for alias specification
-- Consider directive syntax and validation
+- Use clear, copy-pasteable examples
+- Organize content logically (basic → advanced)
+- Include both .gql file and fluent API approaches
+- Add table of contents for easy navigation
 
 ## Testing Requirements
-- [ ] Test mutation building
-- [ ] Test field aliasing
-- [ ] Test directive usage
-- [ ] Test mixed query/mutation scenarios
+- [ ] All code examples in README are tested and working
+- [ ] Examples cover real-world use cases
+- [ ] Documentation matches current API exactly
 
 ## Documentation Updates
-- [ ] Mutation examples in README
-- [ ] Alias usage documentation
-- [ ] Directive usage examples
-```
-
-## Milestone 2 - Advanced Builder API
-
-### Issue #4: Design Fluent Query Builder Methods
-
-**Title**: [API] Design Fluent Query Builder Methods
-
-**Labels**: enhancement, api, milestone-2
-
-**Body**:
-```markdown
-## Problem Description
-Currently can only load complete query strings from files or strings. No way to build queries programmatically in PHP code.
-
-## Proposed API Design
-Add methods to incrementally build GraphQL queries using a fluent interface.
-
-## Acceptance Criteria
-- [ ] Add field selection: `$builder->field('name')->field('email')`
-- [ ] Support nested selections: `$builder->object('user')->field('id')->end()`
-- [ ] Add arguments: `$builder->field('user', ['id' => '$userId'])`
-- [ ] Support aliases: `$builder->field('name', [], 'userName')`
-- [ ] Maintain fluent interface design
-- [ ] Allow mixing with current file/string loading
-
-## API Examples
-```php
-$builder = new QueryBuilder();
-$result = $builder
-    ->query('GetUser')
-    ->field('user', ['id' => '$userId'])
-        ->field('id')
-        ->field('name')
-        ->field('email')
-        ->object('profile')
-            ->field('avatar')
-            ->field('bio')
-        ->end()
-    ->end()
-    ->defineVariable('userId', 'ID!')
-    ->build();
-```
-
-## Implementation Notes
-- Use builder pattern with method chaining
-- Track nesting level for proper query structure
-- Consider performance implications of method chaining
-
-## Testing Requirements
-- [ ] Test all new API methods
-- [ ] Test nested object building
-- [ ] Test integration with existing functionality
-- [ ] Test complex query scenarios
-
-## Documentation Updates
-- [ ] Comprehensive API reference
-- [ ] Migration guide from file-based to API-based building
-- [ ] Best practices for query construction
+- [ ] Complete rewrite of README.md
+- [ ] Add API reference section
+- [ ] Include migration guide if API changes
 ```
 
 ---
 
-### Issue #5: Support Multiple Operations per Request
+### Issue #4: Create Advanced Usage Examples
 
-**Title**: [API] Support Multiple Operations per Request
+**Title**: [Documentation] Create Advanced Usage Examples
 
-**Labels**: enhancement, api, milestone-2
+**Labels**: documentation, examples, milestone-2
 
 **Body**:
 ```markdown
 ## Problem Description
-Can only build one operation at a time. GraphQL supports multiple named operations in a single request.
+Current examples are basic and don't showcase the full capabilities of the library, particularly advanced features like complex mutations, error handling, and real-world patterns.
 
 ## Proposed Solution
-Allow building and returning multiple operations in one GraphQL document.
+Add comprehensive example files demonstrating advanced usage patterns and real-world scenarios.
 
 ## Acceptance Criteria
-- [ ] Support multiple named operations: `query GetUser {...} mutation CreatePost {...}`
-- [ ] Return appropriate structure for multiple operations
-- [ ] Support mixing queries and mutations
-- [ ] Add method to specify operation name
-- [ ] Provide examples showing usage
-
-## API Examples
-```php
-$builder = new QueryBuilder();
-$result = $builder
-    ->operation('query', 'GetUser')
-    ->field('user', ['id' => '$userId'])
-        ->field('id')
-        ->field('name')
-    ->end()
-    ->operation('mutation', 'CreatePost')
-    ->field('createPost', ['input' => '$postInput'])
-        ->field('id')
-        ->field('title')
-    ->end()
-    ->build();
-```
+- [ ] Add mutation examples with complex input types
+- [ ] Show subscription usage patterns  
+- [ ] Demonstrate error handling scenarios
+- [ ] Add real-world examples (pagination, filtering, sorting)
+- [ ] Show integration with popular GraphQL endpoints
+- [ ] Add performance optimization examples
+- [ ] Include examples for different architectural patterns
 
 ## Implementation Notes
-- Modify internal structure to handle multiple operations
-- Consider how to handle variables across operations
-- Update build() method return format
+- Create separate example files for different scenarios
+- Use realistic data structures and operations
+- Include both success and error cases
+- Add comments explaining decision-making
 
 ## Testing Requirements
-- [ ] Test multiple query operations
-- [ ] Test mixed query/mutation operations
-- [ ] Test variable handling across operations
-- [ ] Test operation naming
+- [ ] All examples run without errors
+- [ ] Examples demonstrate best practices
+- [ ] Include examples that show common pitfalls to avoid
 
 ## Documentation Updates
-- [ ] Multiple operation examples
-- [ ] Use cases for multiple operations
-- [ ] Best practices and limitations
+- [ ] New example files in examples/ directory
+- [ ] Update main example.php with advanced scenarios
+- [ ] Document when to use each pattern
 ```
+
+---
+
+## Milestone 3 - Enhanced Validation and Error Handling
+
+### Issue #5: GraphQL Syntax Validation
+
+**Title**: [Enhancement] GraphQL Syntax Validation
+
+**Labels**: enhancement, validation, milestone-3
+
+**Body**:
+```markdown
+## Problem Description
+Currently no validation of GraphQL syntax when loading queries from files or strings, which can lead to runtime errors when queries are used.
+
+## Proposed Solution
+Integrate GraphQL parser for syntax validation with clear error messages.
+
+## Acceptance Criteria
+- [ ] Validate GraphQL syntax when loading from files or strings
+- [ ] Provide clear error messages for syntax issues
+- [ ] Add optional strict mode for enhanced validation
+- [ ] Consider integrating `webonyx/graphql-php` for parsing
+- [ ] Add tests for various syntax error scenarios
+
+## Implementation Notes
+- Add syntax validation as optional feature (enabled by default)
+- Provide option to disable for performance if needed
+- Focus on parse errors rather than schema validation
+
+## Testing Requirements
+- [ ] Test various GraphQL syntax errors
+- [ ] Test valid GraphQL queries pass validation
+- [ ] Test error message clarity and usefulness
+
+## Documentation Updates
+- [ ] Document validation features and options
+- [ ] Add troubleshooting guide for common syntax issues
+```
+
+---
+
+### Issue #6: Enhanced Error Messages and Logging
+
+**Title**: [Enhancement] Enhanced Error Messages and Logging
+
+**Labels**: enhancement, error-handling, milestone-3
+
+**Body**:
+```markdown
+## Problem Description
+Current error messages could be more helpful for debugging, and there's no logging capability for troubleshooting issues.
+
+## Proposed Solution
+Improve exception messages and add optional PSR-3 compatible logging.
+
+## Acceptance Criteria
+- [ ] Enhance error messages with context and suggestions
+- [ ] Add optional PSR-3 compatible logging support
+- [ ] Improve file operation error handling
+- [ ] Add debug mode for detailed information
+- [ ] Include file names and line numbers where applicable
+
+## Implementation Notes
+- Use PSR-3 LoggerInterface as optional dependency
+- Add context to all exceptions
+- Consider adding debug mode for verbose output
+
+## Testing Requirements
+- [ ] Test improved error messages provide useful information
+- [ ] Test logging functionality if implemented
+- [ ] Test error handling in various failure scenarios
+
+## Documentation Updates
+- [ ] Document error handling best practices
+- [ ] Add troubleshooting section with common issues
+```
+
+---
+
+## Milestone 4 - Release and Distribution
+
+### Issue #7: Finalize Composer Package Metadata
+
+**Title**: [Release] Finalize Composer Package Metadata
+
+**Labels**: release, packaging, milestone-4
+
+**Body**:
+```markdown
+## Problem Description
+Current composer.json needs enhancement for professional package distribution on Packagist.
+
+## Proposed Solution
+Add complete metadata and prepare package for publication.
+
+## Acceptance Criteria
+- [ ] Add comprehensive description and keywords
+- [ ] Add author information and homepage URL
+- [ ] Configure proper version constraints for dependencies
+- [ ] Add suggest section for optional dependencies
+- [ ] Prepare CHANGELOG.md with version history
+- [ ] Set up proper semantic versioning
+
+## Implementation Notes
+- Use semantic versioning (start with 1.0.0)
+- Add appropriate keywords for discoverability
+- Include links to documentation and repository
+
+## Testing Requirements
+- [ ] Verify composer.json is valid
+- [ ] Test package installation from local path
+- [ ] Ensure all metadata is accurate
+
+## Documentation Updates
+- [ ] Create CHANGELOG.md
+- [ ] Update README with installation instructions
+- [ ] Add badges for version, tests, etc.
+```
+
+---
+
+### Issue #8: Continuous Integration Setup
+
+**Title**: [Infrastructure] Continuous Integration Setup
+
+**Labels**: ci, infrastructure, milestone-4
+
+**Body**:
+```markdown
+## Problem Description
+No automated testing on multiple PHP versions or automated quality checks.
+
+## Proposed Solution
+Create GitHub Actions workflow for testing and quality assurance.
+
+## Acceptance Criteria
+- [ ] Create workflow testing PHP 8.0, 8.1, 8.2, 8.3
+- [ ] Run PHPUnit tests on all supported versions
+- [ ] Run coding standards checks (when implemented)
+- [ ] Run static analysis (when implemented)
+- [ ] Add status badges to README
+- [ ] Set up proper branch protection rules
+
+## Implementation Notes
+- Use GitHub Actions for CI/CD
+- Test on multiple operating systems if needed
+- Cache dependencies for faster builds
+
+## Testing Requirements
+- [ ] All tests pass on all PHP versions
+- [ ] CI workflow completes successfully
+- [ ] Status badges reflect actual build status
+
+## Documentation Updates
+- [ ] Add CI status badges to README
+- [ ] Document contribution workflow including CI requirements
+```
+
+---
 
 ## Usage Instructions
 
@@ -244,10 +346,9 @@ To create these issues in GitHub:
 
 1. Go to your repository's Issues section
 2. Click "New Issue"
-3. Select the appropriate template (if templates are configured)
-4. Copy the title and body content from above
-5. Add the specified labels
-6. Assign to appropriate milestone
-7. Submit the issue
+3. Copy the title and body content from above
+4. Add the specified labels
+5. Assign to appropriate milestone (create milestones first)
+6. Submit the issue
 
-Each issue follows the established template format and includes all necessary information for implementation.
+Each issue focuses on realistic remaining work rather than features that are already implemented.
